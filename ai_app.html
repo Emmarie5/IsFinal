@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crossy Golf</title>
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive, sans-serif; /* A retro-style font */
+            background-color: #3f6e1f; /* Darker green grass */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            flex-direction: column;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        @import url('[fonts.googleapis.com](https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap)');
+
+        #game-container {
+            position: relative;
+            width: 300px; /* Width of the game area */
+            height: 500px; /* Height of the game area */
+            background-color: #5cb85c; /* Lighter grass */
+            border: 5px solid #2e8b57; /* Border around the game */
+            overflow: hidden; /* Important for keeping elements inside */
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #player {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: #ffe0b2; /* Skin tone for a golfer */
+            border-radius: 5px;
+            bottom: 10px;
+            left: calc(50% - 15px);
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            animation: bounce 0.5s infinite alternate; /* little idle bounce */
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-5px); }
+        }
+
+        .obstacle {
+            position: absolute;
+            width: 60px;
+            height: 30px;
+            background-color: #8b4513; /* Brown for sand traps */
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            color: #fff;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .water {
+            position: absolute;
+            width: 100%; /* Water spans full width */
+            height: 40px;
+            background-color: #4682b4; /* Steel blue for water */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            color: #fff;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            animation: waterFlow 3s infinite linear;
+        }
+
+        @keyframes waterFlow {
+            from { background-position: 0 0; }
+            to { background-position: 100px 0; }
+        }
+
+        .tee {
+            position: absolute;
+            width: 100%;
+            height: 40px;
+            background-color: #a0522d; /* Sienna for the tee box */
+            bottom: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #fff;
+            z-index: 5;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .hole {
+            position: absolute;
+            width: 100%;
+            height: 40px;
+            background-color: #2e8b57; /* Dark green for the hole area */
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-size: 20px;
+            z-index: 5;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .hole::after {
+            content: '⛳'; /* Golf flag emoji */
+            position: absolute;
+            right: 10px;
+            font-size: 25px;
+            animation: flagWiggle 1s infinite alternate;
+        }
+
+        @keyframes flagWiggle {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(5deg) scale(1.05); }
+            100% { transform: rotate(0deg); }
+        }
+
+        #score, #message {
+            margin-top: 15px;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 10px 20px;
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        #message {
+            font-size: 1.5em;
+            color: #ffee00;
+            background-color: rgba(0,0,0,0.6);
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 30px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            background-color: #4CAF50; /* Green button */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px #388a3b;
+            transition: all 0.1s ease;
+        }
+
+        button:active {
+            background-color: #3e8e41;
+            box-shadow: 0 2px #2f6b32;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
+    <h1>Crossy Golf!</h1>
+    <div id="score">Score: 0</div>
+    <div id="game-container">
+        <div class="tee">Start</div>
+        <div class="hole">Hole!</div>
+        <div id="player">🏌️</div>
+        <div id="message"></div>
+    </div>
+    <button id="resetButton" style="display: none;">Play Again!</button>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreDisplay = document.getElementById('score');
+        const messageDisplay = document.getElementById('message');
+        const resetButton = document.getElementById('resetButton');
+
+        const containerWidth = gameContainer.offsetWidth;
+        const containerHeight = gameContainer.offsetHeight;
+        let playerX = containerWidth / 2 - player.offsetWidth / 2;
+        let playerY = containerHeight - player.offsetHeight - 50; // Start just above the tee
+        let score = 0;
+        let gameActive = true;
+
+        const OBSTACLE_SPEED = 2; // Pixels per frame
+        const OBSTACLE_COUNT = 8;
+        const OBSTACLE_TYPES = ['sand', 'water'];
+        const obstacles = [];
+
+        function initGame() {
+            playerX = containerWidth / 2 - player.offsetWidth / 2;
+            playerY = containerHeight - player.offsetHeight - 50;
+            player.style.left = `${playerX}px`;
+            player.style.bottom = `${containerHeight - playerY - player.offsetHeight}px`; // Adjust for bottom positioning
+            score = 0;
+            scoreDisplay.textContent = `Score: ${score}`;
+            gameActive = true;
+            messageDisplay.style.display = 'none';
+            resetButton.style.display = 'none';
+
+            // Clear existing obstacles
+            while (obstacles.length > 0) {
+                obstacles.pop().element.remove();
+            }
+
+            // Create new obstacles
+            for (let i = 0; i < OBSTACLE_COUNT; i++) {
+                createObstacle();
+            }
+            gameLoop();
+        }
+
+        function createObstacle() {
+            const type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+            const obstacle = document.createElement('div');
+            obstacle.classList.add('obstacle');
+            obstacle.textContent = type === 'sand' ? '🏖️' : '🌊'; // Sand or Water emoji
+
+            if (type === 'water') {
+                obstacle.classList.remove('obstacle'); // Remove generic obstacle class
+                obstacle.classList.add('water');
+                obstacle.style.width = '100%';
+                obstacle.style.height = '40px';
+                obstacle.style.left = '0px';
+            } else {
+                obstacle.style.width = `${60 + Math.random() * 40}px`; // Random width for sand
+                obstacle.style.height = `${30 + Math.random() * 20}px`; // Random height for sand
+                obstacle.style.left = `${Math.random() * (containerWidth - parseInt(obstacle.style.width))}px`;
+            }
+
+            obstacle.style.top = `${-50 - Math.random() * containerHeight}px`; // Start off-screen at varying heights
+            gameContainer.appendChild(obstacle);
+            obstacles.push({ element: obstacle, type: type, y: parseFloat(obstacle.style.top) });
+        }
+
+        function updatePlayerPosition() {
+            player.style.left = `${playerX}px`;
+            player.style.bottom = `${containerHeight - playerY - player.offsetHeight}px`;
+        }
+
+        function movePlayer(e) {
+            if (!gameActive) return;
+
+            const step = 30; // How far the player moves per key press
+
+            // Handle WASD and arrow keys
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                    playerY -= step;
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    playerY += step;
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    playerX -= step;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    playerX += step;
+                    break;
+            }
+
+            // Keep player within bounds
+            playerX = Math.max(0, Math.min(containerWidth - player.offsetWidth, playerX));
+            playerY = Math.max(0, Math.min(containerHeight - player.offsetHeight, playerY));
+
+            updatePlayerPosition();
+
+            // Check if player crossed a 'lane' (moved up significantly)
+            if (playerY < containerHeight - 50 - (score + 1) * 30) {
+                 score++;
+                 scoreDisplay.textContent = `Score: ${score}`;
+            }
+
+            checkCollisions();
+            checkWinCondition();
+        }
+
+        function updateObstacles() {
+            for (let i = 0; i < obstacles.length; i++) {
+                const obs = obstacles[i];
+                obs.y += OBSTACLE_SPEED;
+                obs.element.style.top = `${obs.y}px`;
+
+                // If obstacle goes off screen, reset its position and type
+                if (obs.y > containerHeight) {
+                    obs.y = -50 - Math.random() * containerHeight; // Reset far above top
+                    obs.element.style.top = `${obs.y}px`;
+
+                    const newType = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+                    obs.type = newType;
+                    obs.element.textContent = newType === 'sand' ? '🏖️' : '🌊';
+
+                    if (newType === 'water') {
+                        obs.element.classList.remove('obstacle');
+                        obs.element.classList.add('water');
+                        obs.element.style.width = '100%';
+                        obs.element.style.left = '0px';
+                    } else {
+                        obs.element.classList.remove('water');
+                        obs.element.classList.add('obstacle');
+                        obs.element.style.width = `${60 + Math.random() * 40}px`;
+                        obs.element.style.left = `${Math.random() * (containerWidth - parseInt(obs.element.style.width))}px`;
+                    }
+                }
+            }
+        }
+
+        function checkCollisions() {
+            const playerRect = player.getBoundingClientRect();
+            // Adjust playerRect relative to gameContainer for accurate collision detection
+            const playerGameRect = {
+                left: playerRect.left - gameContainer.getBoundingClientRect().left,
+                top: playerRect.top - gameContainer.getBoundingClientRect().top,
+                right: playerRect.right - gameContainer.getBoundingClientRect().left,
+                bottom: playerRect.bottom - gameContainer.getBoundingClientRect().top,
+                width: playerRect.width,
+                height: playerRect.height
+            };
+
+            for (let i = 0; i < obstacles.length; i++) {
+                const obs = obstacles[i];
+                const obsRect = obs.element.getBoundingClientRect();
+                const obsGameRect = {
+                    left: obsRect.left - gameContainer.getBoundingClientRect().left,
+                    top: obsRect.top - gameContainer.getBoundingClientRect().top,
+                    right: obsRect.right - gameContainer.getBoundingClientRect().left,
+                    bottom: obsRect.bottom - gameContainer.getBoundingClientRect().top,
+                    width: obsRect.width,
+                    height: obsRect.height
+                };
+
+                // Simple AABB collision detection
+                if (playerGameRect.left < obsGameRect.right &&
+                    playerGameRect.right > obsGameRect.left &&
+                    playerGameRect.top < obsGameRect.bottom &&
+                    playerGameRect.bottom > obsGameRect.top) {
+                    // Collision detected!
+                    if (obs.type === 'sand') {
+                        endGame("You landed in a sand trap! ⛳");
+                    } else if (obs.type === 'water') {
+                        endGame("Splash! Into the water! 🌊");
+                    }
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            // Player reaches the 'Hole!' area at the top
+            if (playerY <= 40) { // Top 40px is the hole
+                endGame("🎉 Hole in One! You win! 🎉", true);
+            }
+        }
+
+        function endGame(message, win = false) {
+            gameActive = false;
+            messageDisplay.textContent = message + ` Final Score: ${score}`;
+            messageDisplay.style.display = 'block';
+            resetButton.style.display = 'block';
+            if (win) {
+                messageDisplay.style.color = '#00ff00'; // Green for win
+            } else {
+                messageDisplay.style.color = '#ff0000'; // Red for lose
+            }
+        }
+
+        function gameLoop() {
+            if (gameActive) {
+                updateObstacles();
+                checkCollisions();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        document.addEventListener('keydown', movePlayer);
+        resetButton.addEventListener('click', initGame);
+
+        initGame(); // Initialize the game on load
+    </script>
+</body>
+</html>
